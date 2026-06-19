@@ -62,7 +62,7 @@ function ensureDefaultAdmin() {
   const row = db.prepare('SELECT COUNT(*) as c FROM admin_users').get();
   if (row.c === 0) {
     const defaultUser = process.env.ADMIN_USER || 'admin';
-    const defaultPass = process.env.ADMIN_PASS || 'mudar123';
+    const defaultPass = process.env.ADMIN_PASS || 'teste123';
     db.prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)')
       .run(defaultUser, hashPassword(defaultPass));
     console.log(`>> Admin padrao criado: usuario="${defaultUser}" senha="${defaultPass}" (MUDE ISSO)`);

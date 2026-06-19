@@ -9,6 +9,6 @@ services:
       - PORT=7891
       - SESSION_SECRET=${SESSION_SECRET:-troque-esse-segredo}
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASS=${ADMIN_PASS:-mudar123}
+      - ADMIN_PASS=${ADMIN_PASS:-teste123}
     volumes:
       - ./data:/app/data
