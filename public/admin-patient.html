@@ -67,6 +67,18 @@
     .score-bar-bg, .score-bar-fill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     .badge { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   }
+
+  @media (max-width: 768px) {
+    .admin-shell { padding: 14px; }
+    .back-link { font-size: 13px; }
+    .summary-strip { flex-direction: column; }
+    .summary-pill { min-width: auto; }
+    .schema-top { flex-wrap: wrap; }
+    .schema-meta { flex-wrap: wrap; gap: 4px; font-size: 11px; }
+    .schema-card { padding: 12px 14px; }
+    .sort-controls { flex-wrap: wrap; }
+    .sort-controls select { width: 100%; }
+  }
 </style>
 </head>
 <body>

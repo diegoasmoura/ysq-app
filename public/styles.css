@@ -519,3 +519,54 @@ table.data-table tr:hover td { background: var(--hover-bg); }
   .question-text { font-size: 20px; min-height: 80px; }
   .scale-btn { font-size: 16px; }
 }
+
+/* ---------- Mobile: up to 768px ---------- */
+@media (max-width: 768px) {
+  .topbar { padding: 10px 14px; gap: 8px; }
+  .topbar .titles .t1 { font-size: 13px; }
+  .topbar .titles .t2 { font-size: 11px; }
+  .admin-shell { padding: 16px 14px 40px; }
+  .admin-header h1 { font-size: 18px; }
+
+  /* Dashboard table → cards */
+  .data-table, .data-table thead, .data-table tbody, .data-table tr, .data-table th, .data-table td {
+    display: block;
+  }
+  .data-table thead { display: none; }
+  .data-table tr {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .data-table td {
+    padding: 4px 0;
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .data-table td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+  .data-table .row-actions { justify-content: flex-end; padding-top: 6px; }
+
+  /* New patient row */
+  .new-patient-row { flex-direction: column; gap: 10px; }
+  .new-patient-row .input { width: 100%; }
+  .new-patient-row .btn { width: 100%; }
+
+  /* Summary pills */
+  .summary-strip { flex-direction: column; }
+  .summary-pill { min-width: auto; }
+
+  /* Schema cards */
+  .schema-top { flex-wrap: wrap; }
+  .schema-meta { flex-wrap: wrap; gap: 4px; }
+}

@@ -218,12 +218,12 @@ function renderPatients(patients) {
       <tbody>
         ${patients.map(p => `
           <tr>
-            <td>
+            <td data-label="Paciente">
               ${p.completedAt
                 ? `<a class="name-link" href="/admin/paciente/${p.id}">${escapeHtml(p.name)}</a>`
                 : `<span>${escapeHtml(p.name)}</span>`}
             </td>
-            <td>
+            <td data-label="Progresso">
               <div class="progress-cell">
                 <div class="progress-bar-bg">
                   <div class="progress-bar-fill" style="width:${p.progressPct}%"></div>
@@ -231,14 +231,14 @@ function renderPatients(patients) {
                 <span class="progress-label">${p.answeredCount}/${p.totalItems} (${p.progressPct}%)</span>
               </div>
             </td>
-            <td>
+            <td data-label="Status">
               ${p.completedAt
                 ? '<span class="badge completo">Concluído</span>'
                 : (p.answeredCount > 0 ? '<span class="badge andamento">Em andamento</span>' : '<span class="badge nao-iniciado">Não iniciado</span>')}
             </td>
-            <td>${formatDateTime(p.lastAnsweredAt)}</td>
-            <td>${formatDate(p.createdAt)}</td>
-            <td>
+            <td data-label="Última resposta">${formatDateTime(p.lastAnsweredAt)}</td>
+            <td data-label="Criado em">${formatDate(p.createdAt)}</td>
+            <td data-label="Ações">
               <div class="row-actions">
                 <button class="icon-btn" data-action="copy" data-token="${p.token}">Copiar link</button>
                 ${p.completedAt ? `<a class="icon-btn" href="/admin/paciente/${p.id}" style="text-decoration:none;">Ver resultado</a>` : ''}
