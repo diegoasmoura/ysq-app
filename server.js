@@ -147,6 +147,8 @@ app.post('/api/form/:token/finish', (req, res) => {
 
 // ================= ROTAS ADMIN =================
 
+app.get('/', (req, res) => res.redirect('/admin'));
+
 app.get('/admin/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
