@@ -1,0 +1,14 @@
+services:
+  ysq-app:
+    build: .
+    container_name: ysq-app
+    restart: unless-stopped
+    ports:
+      - "7891:7891"
+    environment:
+      - PORT=7891
+      - SESSION_SECRET=${SESSION_SECRET:-troque-esse-segredo}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-mudar123}
+    volumes:
+      - ./data:/app/data
