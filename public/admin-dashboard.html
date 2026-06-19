@@ -108,6 +108,21 @@ function showToast(msg) {
   setTimeout(() => toastEl.classList.remove('show'), 2200);
 }
 
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => showToast('Link copiado'));
+  } else {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.style.position = 'fixed'; el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast('Link copiado');
+  }
+}
+
 document.getElementById('logoutBtn').addEventListener('click', async () => {
   await fetch('/api/admin/logout', { method: 'POST' });
   window.location.href = '/admin/login';
@@ -239,7 +254,7 @@ function renderPatients(patients) {
   container.querySelectorAll('[data-action="copy"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const url = `${window.location.origin}/f/${btn.dataset.token}`;
-      navigator.clipboard.writeText(url).then(() => showToast('Link copiado para a área de transferência'));
+      copyText(url);
     });
   });
 
@@ -311,7 +326,7 @@ async function addPatient() {
       </div>
     `;
     document.getElementById('copyNewLink').addEventListener('click', () => {
-      navigator.clipboard.writeText(url).then(() => showToast('Link copiado'));
+      copyText(url);
     });
 
     loadPatients();
