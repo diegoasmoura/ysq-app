@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resultado — Agenda Clinical</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .back-link { font-size:13.5px; color: var(--ink-soft); text-decoration:none; display:inline-flex; align-items:center; gap:4px; margin-bottom: 16px; }
+  .back-link:hover { color: var(--sage-deep); }
+  .summary-strip { display:flex; gap: 14px; margin-bottom: 22px; flex-wrap:wrap; }
+  .summary-pill {
+    background: var(--paper); border:1px solid var(--line); border-radius: 11px;
+    padding: 14px 18px; flex:1; min-width: 140px;
+  }
+  .summary-pill .label { font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; font-weight:600; }
+  .summary-pill .value { font-family: var(--font-display); font-size: 22px; color: var(--sage-deep); margin-top:4px; }
+  .schema-card {
+    background: var(--paper); border:1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 10px;
+  }
+  .schema-top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom: 8px; }
+  .schema-name { font-weight:600; font-size:15px; }
+  .schema-code { color: var(--ink-soft); font-size:12px; font-family: monospace; }
+  .schema-meta { display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-soft); margin-top:8px; }
+  .sort-controls { display:flex; gap:8px; margin-bottom: 14px; align-items:center; font-size: 13px; color: var(--ink-soft); }
+  .sort-controls select {
+    width:auto; padding: 7px 10px; font-size: 13px;
+    background: var(--paper); color: var(--ink); border: 1.5px solid var(--line);
+    border-radius: 9px; font-family: var(--font-ui);
+  }
+  .sort-controls select:focus { outline: 2px solid var(--sage-soft); border-color: var(--sage); }
+  .schema-desc { margin-top: 10px; font-size: 13px; }
+  .schema-desc summary {
+    cursor: pointer; color: var(--ink-soft); font-size: 12.5px; font-weight: 500;
+    padding: 4px 0; user-select: none;
+  }
+  .schema-desc summary:hover { color: var(--sage); }
+  .schema-anal { font-size: 13px; line-height: 1.7; padding: 8px 0 2px; color: var(--ink); }
+  .schema-anal .anal-hint { font-weight: 600; color: var(--sage-deep); }
+  .schema-desc p {
+    margin: 8px 0 4px; line-height: 1.6; color: var(--ink);
+    font-family: var(--font-body); font-size: 13.5px;
+  }
+  .print-btn { display:none; }
+  @media print {
+    @page { margin: 10mm 12mm 15mm; }
+    body { padding: 0; }
+    .print-hide { display: none !important; }
+    .print-hide-meta { display: none !important; }
+    #rawAnswers details { break-inside: avoid; page-break-inside: avoid; }
+    #rawAnswers details > div { grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)) !important; }
+    #rawAnswers details > div > div { padding: 3px 1px !important; }
+    #rawAnswers details > div > div > div:first-child { font-size: 9px !important; }
+    #rawAnswers details > div > div > div:last-child { font-size: 14px !important; }
+    .topbar, .back-link, .sort-controls, .icon-btn, .print-btn { display:none !important; }
+    .card, .schema-card { box-shadow:none; border-color: var(--line); }
+    .schema-card { break-inside: avoid; page-break-inside: avoid; margin-top: 16px; }
+    .summary-strip { break-inside: avoid; page-break-inside: avoid; }
+    .schema-desc { margin-bottom: 8px; }
+    .schema-desc summary { cursor: default; }
+    .interpretation { margin-bottom: 8px; }
+    .interpretation summary { cursor: default; }
+    .raw-items { break-inside: avoid; page-break-inside: avoid; }
+    .score-bar-bg, .score-bar-fill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .badge { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo-mark">Y</div>
+  <div class="titles">
+    <div class="t1">Agenda Clinical</div>
+    <div class="t2">Resultado YSQ-L3</div>
+  </div>
+  <button id="themeToggle" class="theme-btn" aria-label="Alternar tema claro/escuro" title="Alternar tema">🌙</button>
+  <button class="icon-btn" id="printBtn">Imprimir / PDF</button>
+</div>
+
+<div class="admin-shell">
+  <a href="/admin" class="back-link">← Voltar para pacientes</a>
+  <div id="content">
+    <p style="color:var(--ink-soft); text-align:center; padding:40px;">Carregando…</p>
+  </div>
+</div>
+
+<script>
+const patientId = window.location.pathname.split('/admin/paciente/')[1];
+const content = document.getElementById('content');
+
+const LEVEL_COLOR = {
+  'Baixa': 'var(--sage)',
+  'Moderada': 'var(--amber)',
+  'Alta': 'var(--danger)',
+  'Muito Alta': 'var(--danger)'
+};
+
+const DESCRIPTIONS = {
+  'pe': 'Crença de que os outros não proverão apoio emocional, afeto ou proteção adequados. O paciente sente que suas necessidades emocionais nunca serão verdadeiramente atendidas. Escores altos sugerem histórico de negligência afetiva e dificuldade em confiar que os outros se importam.',
+  'ai_ab': 'Percepção de que as pessoas próximas são instáveis ou pouco confiáveis, gerando medo intenso de ser abandonado. Escores altos indicam hipersensibilidade a sinais de rejeição, comportamentos de busca excessiva de segurança e padrão de relacionamentos instáveis.',
+  'da': 'Expectativa generalizada de que os outros vão enganar, humilhar ou se aproveitar. Escores altos sugerem histórico de traumas interpessoais ou abuso, resultando em hipervigilância, dificuldade de confiar e tendência a se proteger excessivamente.',
+  'is': 'Sensação de ser diferente, deslocado ou não pertencer a nenhum grupo. Escores altos indicam solidão crônica, dificuldade de conexão social e crença de não ser aceito ou compreendido pelos pares.',
+  'dv': 'Crença de ser internamente defeituoso, inadequado ou indigno de amor. Escores altos sugerem vergonha tóxica, autocrítica severa e medo de exposição — o paciente acredita que, se conhecido verdadeiramente, será rejeitado.',
+  'fr': 'Crença de ser incapaz de ter bom desempenho ou alcançar realizações comparáveis aos outros. Escores altos indicam baixa autoeficácia, histórico de críticas ou comparações negativas e evitação de desafios por medo de fracassar.',
+  'di': 'Sensação de incapacidade de lidar com responsabilidades diárias sem assistência externa. Escores altos sugerem superproteção na infância, dificuldade de tomar decisões e dependência funcional de outras pessoas.',
+  'vd': 'Medo exagerado e persistente de que tragédias ou catástrofes estão prestes a acontecer. Escores altos indicam ansiedade generalizada, hipervigilância corporal e comportamentos excessivos de segurança e evitação de riscos.',
+  'em': 'Envolvimento emocional excessivo com figuras parentais ou parceiro, com perda de identidade e autonomia. Escores altos sugerem fusão relacional, dificuldade de individuação e sentimento de culpa ao se separar do outro.',
+  'sb': 'Tendência a ceder ao controle dos outros para evitar conflito, retaliação ou abandono. Escores altos indicam supressão das próprias necessidades, dificuldade de assertividade e sensação de não ter controle sobre a própria vida.',
+  'as': 'Foco excessivo em satisfazer as necessidades alheias em detrimento das próprias. Escores altos sugerem superfuncionamento nos relacionamentos, culpa ao priorizar a si mesmo, exaustão crônica e dificuldade de receber cuidado.',
+  'ie': 'Dificuldade em expressar emoções — especialmente vulnerabilidade, afeto positivo e raiva. Escores altos indicam rigidez emocional, constrangimento com demonstrações de sentimento e desconforto com a espontaneidade alheia.',
+  'pi': 'Busca por padrões extremamente elevados com perfeccionismo que compromete a qualidade de vida. Escores altos sugerem autocrítica implacável, sacrifício de prazer em prol de metas e insatisfação crônica com o próprio desempenho.',
+  'ag': 'Crença de ser superior ou especial, com direito a privilégios e tratamento diferenciado. Escores altos indicam dificuldade com limites, baixa tolerância a frustrações e tendência a dominar ou desconsiderar as necessidades alheias.',
+  'ai_id': 'Dificuldade em tolerar frustração e persistir em tarefas rotineiras ou desinteressantes. Escores altos sugerem impulsividade, baixa tolerância ao desconforto e padrões de procrastinação ou abandono de projetos.',
+  'ba': 'Necessidade excessiva de validação, reconhecimento e aprovação externa. Escores altos indicam autoestima condicional, tendência a agradar e dificuldade de agir de forma autêntica ou tomar decisões independentes.',
+  'np': 'Foco persistente nos aspectos negativos da vida, com expectativa pessimista sobre o futuro. Escores altos sugerem tendência à ruminação, dificuldade de celebrar conquistas e viés de atenção para ameaças e perdas.',
+  'pp': 'Crença de que erros e falhas merecem punição severa, sem espaço para perdão. Escores altos indicam autocrítica punitiva, dificuldade de perdoar a si e aos outros, e rigidez moral que impede a resolução de conflitos.'
+};
+
+async function load() {
+  const res = await fetch(`/api/admin/patients/${patientId}/results`);
+  if (res.status === 401) { window.location.href = '/admin/login'; return; }
+  if (!res.ok) {
+    content.innerHTML = `<div class="card empty-state"><h2>Não encontrado</h2></div>`;
+    return;
+  }
+  const data = await res.json();
+  render(data);
+}
+
+function render(data) {
+  const { patient, schemas, totalAnswered, totalItems, progressPct } = data;
+
+  const sortedByAvg = [...schemas].sort((a, b) => (b.average || 0) - (a.average || 0));
+  const topSchemas = sortedByAvg.filter(s => s.average !== null).slice(0, 3);
+
+  content.innerHTML = `
+    <h1 style="font-family: var(--font-display); font-size:24px; color:var(--ink); margin-bottom:2px;">${escapeHtml(patient.name)}</h1>
+    <p style="color:var(--ink-soft); font-size:13.5px; margin-top:0; margin-bottom:20px;">
+      <span class="print-hide-meta">${patient.completedAt ? 'Concluído em ' + formatDate(patient.completedAt) : 'Em andamento'} ·</span>
+      ${totalAnswered}/${totalItems} itens respondidos (${progressPct}%)
+    </p>
+
+    ${topSchemas.length ? `
+      <div class="summary-strip">
+        ${topSchemas.map(s => `
+          <div class="summary-pill">
+            <div class="label">${s.name}</div>
+            <div class="value">${s.average.toFixed(1)}<span style="font-size:13px;color:var(--ink-soft);"> /6</span></div>
+          </div>
+        `).join('')}
+      </div>
+      <p class="print-hide-meta" style="font-size:13px; color:var(--ink-soft); margin-top:-10px; margin-bottom:24px;">
+        Esquemas com maior pontuação média — pontos de partida sugeridos para conversa clínica.
+      </p>
+    ` : ''}
+
+    <div class="sort-controls">
+      <span>Ordenar por:</span>
+      <select id="sortSelect">
+        <option value="order">Ordem do questionário</option>
+        <option value="avg">Pontuação (maior primeiro)</option>
+        <option value="name">Nome do esquema</option>
+      </select>
+    </div>
+
+    <div id="schemaList"></div>
+
+    <details style="margin-top: 28px;">
+      <summary style="cursor:pointer; color:var(--ink-soft); font-size:13.5px;">Respostas por esquema  <span style="font-size:11px;">(≥4 destacado)</span></summary>
+      <div id="rawAnswers" style="margin-top:14px;"></div>
+    </details>
+  `;
+
+  const INTERP = {
+    pe: {
+      alta: 'A privação emocional aparece como uma ferida significativa na história afetiva deste paciente. Há uma percepção consistente de que suas necessidades emocionais mais básicas — ser cuidado, acolhido, ouvido — não foram adequadamente correspondidas. Essa vivência não parece isolada: atravessa diferentes dimensões do cuidado, sugerindo um ambiente relacional onde a disponibilidade afetiva foi escassa ou inconsistente. O paciente carrega a sensação de não ter sido especial ou priorizado por figuras significativas, o que pode ter deixado marcas profundas em sua capacidade de confiar que suas necessidades importam.',
+      moderada: 'O paciente apresenta indicadores de que experienciou alguma privação emocional em sua história, mas essa percepção pode não ser absoluta ou generalizada. É possível que tenha tido figuras de cuidado inconsistentes — ora disponíveis, ora ausentes — gerando uma vulnerabilidade nessa área, mas não uma crença totalmente enraizada de que suas necessidades não importam.',
+      baixa: 'Este não parece ser um tema central de sofrimento para o paciente. As experiências de cuidado e acolhimento emocional possivelmente foram suficientemente boas, ou o paciente desenvolveu outras fontes de suporte que compensam eventuais lacunas.'
+    },
+    ai_ab: {
+      alta: 'O medo do abandono e da instabilidade relacional é uma força organizadora importante na vida emocional deste paciente. Há uma hipersensibilidade a sinais de rejeição ou distanciamento, e uma expectativa de que as pessoas importantes eventualmente irão embora ou deixarão de estar disponíveis. Essa preocupação pode se manifestar como busca intensa de proximidade e garantias, ou como proteção antecipatória — afastar-se antes de ser abandonado. A instabilidade percebida nas relações parece ter gerado uma dificuldade central em confiar na permanência do outro.',
+      moderada: 'Há traços de sensibilidade ao abandono, mas essa preocupação não parece dominar o funcionamento do paciente. Pode haver medo de rejeição em contextos específicos (relações amorosas, amizades íntimas) sem que isso se generalize para todas as relações significativas.',
+      baixa: 'O paciente não demonstra preocupação significativa com abandono ou instabilidade nas relações. Parece confiar razoavelmente na permanência e disponibilidade das pessoas importantes.'
+    },
+    da: {
+      alta: 'A desconfiança é uma marca importante na forma como este paciente se relaciona com o mundo. Há uma expectativa generalizada de que os outros podem enganar, manipular ou se aproveitar, o que sugere experiências precoces ou repetidas de violação de confiança. O paciente parece viver em estado de alerta constante, esperando segundas intenções e protegendo-se de possíveis traições. Essa hipervigilância, embora compreensível como proteção, pode estar impedindo a construção de vínculos genuínos de confiança.',
+      moderada: 'O paciente demonstra alguma desconfiança nas relações, mas sem atingir um nível generalizado. Pode haver cautela em situações específicas ou com certos perfis de pessoas, possivelmente como reflexo de experiências pontuais de decepção.',
+      baixa: 'O paciente tende a confiar nas pessoas sem expectativas negativas significativas. Não parece carregar marcas de traição ou abuso que contaminem sua visão sobre os outros.'
+    },
+    is: {
+      alta: 'O isolamento social é uma experiência marcante para este paciente. Há uma sensação profunda de ser diferente, deslocado, de não pertencer — como se houvesse uma barreira invisível separando-o dos outros. Essa percepção de não se encaixar pode ter gerado um padrão de evitação social ou, alternativamente, um esforço constante e exaustivo para parecer "normal". A solidão resultante não é apenas física, mas existencial: o paciente sente que não é compreendido nem aceito em sua essência.',
+      moderada: 'O paciente relata algum grau de desconforto social e sensação de não pertencimento, mas isso pode ser contextual — situacional em vez de uma identidade central. Pode ter dificuldade em grupos novos ou sentir-se diferente em certos ambientes, sem que isso defina sua experiência relacional como um todo.',
+      baixa: 'O paciente parece sentir-se integrado socialmente, com capacidade de pertencimento e conexão com grupos e pessoas. Não há indicadores de isolamento significativo.'
+    },
+    dv: {
+      alta: 'A vergonha e a crença na própria defectividade são temas centrais para este paciente. Há uma convicção interna de ser inadequado, defeituoso ou fundamentalmente falho — como se houvesse algo errado em sua essência que, se descoberto, levaria à rejeição. Essa crença pode estar na raiz de um intenso trabalho de autoconcealmento: o paciente se esforça para esconder quem "realmente é", vivendo com medo constante de exposição. A autocrítica é severa, e a sensação de não ser digno de amor ou respeito parece permear diferentes áreas da vida.',
+      moderada: 'Há indicadores de autocrítica e sentimentos de inadequação, mas esses não parecem constituir uma crença nuclear generalizada. O paciente pode sentir-se inseguro em contextos específicos ou duvidar de seu valor em certas áreas, sem que isso defina sua identidade.',
+      baixa: 'O paciente não demonstra crenças significativas de defectividade ou vergonha. Parece ter uma autoimagem razoavelmente integrada e positiva.'
+    },
+    fr: {
+      alta: 'A crença no fracasso é uma fonte importante de sofrimento para este paciente. Há uma percepção consolidada de não ser capaz de realizar ou ter um desempenho à altura dos outros — como se houvesse uma incompetência fundamental que o impede de alcançar seus objetivos. Essa crença pode estar gerando evitação de desafios, baixa persistência diante de dificuldades e um ciclo de autoconfirmação: o paciente não tenta por medo de fracassar, e o não-tentar é vivido como mais uma prova de sua incapacidade.',
+      moderada: 'O paciente apresenta alguma insegurança quanto à própria competência e capacidade de realização, mas sem uma crença consolidada de fracasso. Pode haver dúvidas em áreas específicas ou comparações negativas em contextos pontuais.',
+      baixa: 'O paciente confia razoavelmente em sua capacidade de realizar e alcançar objetivos. Não há indicadores de crença significativa de fracasso ou incompetência.'
+    },
+    di: {
+      alta: 'A dependência e a sensação de incompetência são marcantes para este paciente. Há uma crença genuína de que não consegue lidar com as responsabilidades do dia a dia sem assistência externa — como se fosse fundamentalmente incapaz de se virar sozinho. Essa percepção pode ter origens em superproteção ou críticas que minaram sua autonomia. O paciente pode buscar constantemente orientação e validação para decisões cotidianas, e sentir-se paralisado diante de tarefas que exigem iniciativa própria.',
+      moderada: 'O paciente demonstra alguma dependência em situações específicas, mas mantém autonomia em áreas importantes. Pode buscar mais apoio que o necessário em momentos de estresse, sem que isso configure uma dependência generalizada.',
+      baixa: 'O paciente sente-se capaz de gerenciar suas responsabilidades e tomar decisões de forma autônoma. Não há indicadores de dependência significativa.'
+    },
+    vd: {
+      alta: 'A vulnerabilidade ao dano é uma fonte significativa de ansiedade para este paciente. Há um medo persistente e exagerado de que tragédias ou catástrofes estão prestes a acontecer — doenças graves, acidentes, desastres financeiros. O mundo é percebido como um lugar intrinsecamente perigoso, e o paciente parece viver em estado de alerta constante, tomando precauções excessivas para evitar ameaças imaginadas. Esse medo pode estar limitando sua liberdade e qualidade de vida.',
+      moderada: 'O paciente apresenta preocupações com segurança e bem-estar que são mais elevadas que o comum, mas sem atingir um nível paralisante. Pode haver cautela excessiva em situações específicas, sem que o medo domine seu funcionamento global.',
+      baixa: 'O paciente não demonstra medos significativos de catástrofes ou ameaças iminentes. Parece sentir-se razoavelmente seguro no mundo.'
+    },
+    em: {
+      alta: 'O emaranhamento com figuras familiares ou parceiro é uma característica central na vida deste paciente. Há uma fusão emocional que dificulta a diferenciação entre seus próprios desejos, sentimentos e identidade e os do outro. O paciente pode sentir-se sufocado ou, alternativamente, vivenciar a separação como uma ameaça. A individuação parece ter sido dificultada — seja por superenvolvimento parental, seja por dinâmicas relacionais que penalizam a autonomia. O preço dessa fusão é a perda de uma identidade própria clara.',
+      moderada: 'Há indicadores de algum emaranhamento relacional, mas o paciente mantém certo grau de individuação. Pode haver dificuldade em estabelecer limites em relações específicas, sem uma perda generalizada de identidade.',
+      baixa: 'O paciente parece ter uma identidade bem diferenciada e não apresenta dificuldades significativas de individuação ou autonomia relacional.'
+    },
+    sb: {
+      alta: 'A subjugação é um padrão relacional marcante para este paciente. Há uma tendência consistente a suprimir as próprias necessidades, opiniões e desejos para evitar conflitos, retaliação ou abandono. O paciente parece sentir que não tem outra escolha senão ceder — como se sua própria vontade fosse perigosa ou ilegítima. Essa submissão pode gerar um acúmulo silencioso de ressentimento, que eventualmente vaza de formas indiretas. A sensação de não ter controle sobre a própria vida é um tema recorrente.',
+      moderada: 'O paciente tende a ceder em situações de conflito ou pressão, mas não de forma generalizada. Pode ter dificuldade em ser assertivo em contextos específicos, sem que isso defina todas as suas relações.',
+      baixa: 'O paciente demonstra capacidade de assertividade e de defender suas próprias necessidades. Não há padrão significativo de subjugação.'
+    },
+    as: {
+      alta: 'O autossacrifício é um padrão central no funcionamento deste paciente. Há uma orientação consistente para colocar as necessidades dos outros à frente das próprias, frequentemente em prejuízo de seu bem-estar. O paciente parece sentir-se responsável pelo cuidado de todos ao redor, e pode ter dificuldade em receber cuidado ou em pedir ajuda. Esse padrão, embora possa trazer validação externa, tende a gerar exaustão crônica e ressentimento não reconhecido. A culpa ao priorizar a si mesmo é um obstáculo significativo para o autocuidado.',
+      moderada: 'O paciente apresenta tendência ao autossacrifício em algumas áreas, mas mantém capacidade de cuidar de si em aspectos importantes. Pode haver dificuldade em equilibrar as próprias necessidades com as dos outros, especialmente em relações próximas.',
+      baixa: 'O paciente demonstra capacidade de equilibrar suas necessidades com as dos outros. Não há padrão significativo de autossacrifício.'
+    },
+    ie: {
+      alta: 'A inibição emocional é uma característica marcante para este paciente. Há uma dificuldade significativa em expressar emoções — especialmente vulnerabilidade, afeto positivo e raiva — como se demonstrar sentimentos fosse perigoso, inadequado ou sinal de fraqueza. O paciente pode ser percebido como distante, controlado ou frio, ainda que internamente possa experimentar emoções intensas. Essa supressão emocional, embora possa ter funcionado como proteção no passado, tende a empobrecer as relações e gerar uma sensação de desconexão dos próprios afetos.',
+      moderada: 'O paciente apresenta alguma dificuldade em expressar emoções, mas sem atingir um nível de inibição generalizada. Pode haver desconforto com demonstrações emocionais em contextos específicos, ou tendência a controlar a expressão de certos sentimentos.',
+      baixa: 'O paciente demonstra capacidade de expressar suas emoções de forma razoavelmente espontânea. Não há indicadores de inibição emocional significativa.'
+    },
+    pi: {
+      alta: 'Os padrões inflexíveis são uma força motriz importante na vida deste paciente. Há uma busca incansável por padrões extremamente elevados de desempenho, acompanhada de autocrítica implacável quando esses padrões não são atingidos. O perfeccionismo parece estar comprometendo a qualidade de vida: o paciente pode sacrificar prazer, descanso e relacionamentos em prol de metas cada vez mais altas. A insatisfação crônica com o próprio desempenho — sempre "poderia ser melhor" — é um tema recorrente. O descanso e a celebração de conquistas são vividos como desperdício ou perigo.',
+      moderada: 'O paciente apresenta padrões elevados e certa autocrítica, mas sem comprometimento significativo da qualidade de vida. Pode ser exigente em áreas específicas (trabalho, estudos) sem que isso domine todas as esferas da vida.',
+      baixa: 'O paciente demonstra padrões flexíveis e capacidade de se sentir satisfeito com seu desempenho. Não há indicadores de perfeccionismo disfuncional.'
+    },
+    ag: {
+      alta: 'O arrogo e a grandiosidade aparecem como traços significativos neste paciente. Há uma crença de ser especial ou merecedor de privilégios que os outros não têm, acompanhada de dificuldade em aceitar limites, regras ou frustrações. O paciente pode ter dificuldade em considerar as necessidades alheias e tender a priorizar seus próprios desejos. Esse padrão, embora possa trazer ganhos secundários, tende a gerar conflitos interpessoais e dificuldade em manter relações equilibradas, onde a reciprocidade é esperada.',
+      moderada: 'O paciente apresenta alguns traços de grandiosidade ou expectativa de tratamento especial, mas sem atingir um nível disfuncional. Pode ter dificuldade em aceitar certas frustrações ou limites, especialmente em áreas que considera importantes.',
+      baixa: 'O paciente demonstra capacidade de aceitar limites e considerar as necessidades alheias. Não há indicadores significativos de grandiosidade ou arrogo.'
+    },
+    ai_id: {
+      alta: 'A autodisciplina insuficiente é uma área de dificuldade importante para este paciente. Há um padrão consistente de dificuldade em tolerar frustração, adiar gratificação e persistir em tarefas rotineiras ou desinteressantes. O paciente pode descrever uma história de projetos abandonados, dificuldade de seguir rotinas e tendência a agir por impulso. Essa baixa tolerância ao desconforto parece estar gerando prejuízos em várias áreas — profissional, financeira, saúde — e alimentando um ciclo de autocrítica por não conseguir "se disciplinar".',
+      moderada: 'O paciente apresenta alguma dificuldade com disciplina e persistência, mas sem comprometimento generalizado. Pode ter áreas onde consegue manter rotinas e outras onde a impulsividade ou a procrastinação predominam.',
+      baixa: 'O paciente demonstra capacidade razoável de autocontrole, persistência e tolerância à frustração. Não há indicadores significativos de autodisciplina insuficiente.'
+    },
+    ba: {
+      alta: 'A busca de aprovação é uma força central na vida deste paciente. Há uma necessidade intensa e constante de validação externa — como se seu valor dependesse fundamentalmente do olhar e da aprovação dos outros. O paciente parece moldar seu comportamento, suas escolhas e até sua aparência para obter aceitação e admiração. Essa dependência da validação externa pode estar obscurecendo seus próprios desejos e valores, gerando uma sensação de vazio ou de não saber quem realmente é quando não está performando para os outros.',
+      moderada: 'O paciente valoriza a aprovação externa e pode ajustar seu comportamento para agradar, mas sem perder completamente o contato com suas próprias preferências. Há certa dependência da validação alheia, mas não a ponto de definir sua identidade.',
+      baixa: 'O paciente demonstra uma autoestima razoavelmente estável e não depende excessivamente da aprovação externa. Consegue agir de forma autêntica mesmo quando isso pode desagradar.'
+    },
+    np: {
+      alta: 'O pessimismo e a negatividade são lentes através das quais este paciente enxerga a vida. Há uma tendência consistente a focar nos aspectos negativos das situações, esperar o pior e minimizar ou desqualificar o que é positivo. Essa visão pessimista pode ter funcionado originalmente como proteção contra decepções ("se eu não esperar nada de bom, não vou me frustrar"), mas parece estar gerando um viés que empobrece a experiência do paciente e dificulta a celebração de conquistas. A ruminação e a preocupação com o que pode dar errado ocupam um espaço significativo.',
+      moderada: 'O paciente apresenta tendência ao pessimismo em algumas áreas, mas sem um viés negativo generalizado. Pode haver preocupação excessiva com riscos ou dificuldade em confiar em resultados positivos, especialmente em situações de incerteza.',
+      baixa: 'O paciente demonstra uma visão equilibrada, com capacidade de reconhecer aspectos positivos e negativos sem dominância do pessimismo.'
+    },
+    pp: {
+      alta: 'A postura punitiva é uma característica marcante na forma como este paciente se relaciona consigo mesmo e com os outros. Há uma crença rígida de que erros e falhas merecem punição severa, sem espaço para perdão, compreensão ou circunstâncias atenuantes. Essa rigidez moral se aplica tanto a si mesmo — com autocrítica implacável e dificuldade de se perdoar — quanto aos outros, com exigência de reparação ou punição. Essa postura pode estar gerando um clima interno de severidade constante, onde o erro é vivido como imperdoável e o aprendizado como impossível.',
+      moderada: 'O paciente apresenta alguma rigidez na avaliação de erros — próprios e alheios — mas sem atingir um padrão punitivo generalizado. Pode haver autocrítica elevada em certas áreas e dificuldade de perdoar em situações específicas.',
+      baixa: 'O paciente demonstra capacidade de perdoar erros — próprios e alheios — e uma visão equilibrada sobre falhas e responsabilidades. Não há indicadores de postura punitiva significativa.'
+    }
+  };
+
+  function analyzeSchema(schema, byItem, itemsMap) {
+    const parts = schema.itemRange.split('-');
+    const itemNums = [];
+    for (let i = +parts[0]; i <= +parts[1]; i++) itemNums.push(i);
+    const scored = itemNums.map(n => ({ n, score: byItem.get(n) })).filter(x => x.score != null);
+    if (scored.length === 0) return null;
+
+    const max = Math.max(...scored.map(x => x.score));
+    const min = Math.min(...scored.map(x => x.score));
+    const highs = scored.filter(x => x.score === max);
+    const lows = scored.filter(x => x.score === min);
+    const avg = scored.reduce((s, x) => s + x.score, 0) / scored.length;
+
+    const levelKey = avg >= 3.5 ? 'alta' : (avg >= 2.5 ? 'moderada' : 'baixa');
+    let t = INTERP[schema.code] && INTERP[schema.code][levelKey]
+      ? INTERP[schema.code][levelKey]
+      : `${schema.name}: nível ${schema.level} (média ${avg.toFixed(2)}).`;
+
+    if (max >= 6 && highs.length > 0) {
+      const itemText = itemsMap[highs[0].n] || '';
+      const short = itemText.length > 85 ? itemText.slice(0, 85) + '…' : itemText;
+      t += ` O item que o paciente mais endossou (nota 6) foi: "${short}"`;
+      if (highs.length > 1) {
+        t += `, junto com os itens ${highs.slice(1).map(x => x.n).join(', ')}`;
+      }
+      t += '.';
+    }
+
+    if (min <= 2 && max - min >= 3 && lows.length > 0 && lows[0].n !== (highs[0] && highs[0].n)) {
+      t += ` Vale notar que o item ${lows[0].n} recebeu nota ${min} — uma resposta significativamente mais baixa que pode representar uma área de exceção ou proteção relativa dentro deste esquema.`;
+    }
+
+    return `<div class="schema-anal">${t}</div>`;
+  }
+
+  function renderSchemaList(order) {
+    let list = [...schemas];
+    if (order === 'avg') list.sort((a, b) => (b.average || -1) - (a.average || -1));
+    if (order === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+    document.getElementById('schemaList').innerHTML = list.map(s => {
+      const pct = s.average !== null ? Math.round((s.average / 6) * 100) : 0;
+      const color = s.level ? LEVEL_COLOR[s.level] : 'var(--line)';
+      const anal = analyzeSchema(s, byItem, itemsMap);
+      return `
+        <div class="schema-card">
+          <div class="schema-top">
+            <div>
+              <span class="schema-name">${s.name}</span>
+              <span class="schema-code">(${s.code} · itens ${s.itemRange})</span>
+            </div>
+            ${s.level ? `<span class="level-tag" style="color:${color};">${s.level}</span>` : '<span style="font-size:12px;color:var(--ink-soft);">incompleto</span>'}
+          </div>
+          <div class="schema-bar-track">
+            <div class="schema-bar-fill" style="width:${pct}%; background:${color};"></div>
+          </div>
+          <div class="schema-meta">
+            <span>Soma: ${s.sum} / ${s.maxPossible}</span>
+            <span>Média: ${s.average !== null ? s.average.toFixed(2) : '—'}</span>
+            <span>${s.answeredItems}/${s.totalItems} respondidos</span>
+          </div>
+          ${DESCRIPTIONS[s.code] ? `
+            <details class="schema-desc">
+              <summary>O que significa</summary>
+              <p>${DESCRIPTIONS[s.code]}</p>
+            </details>
+          ` : ''}
+          ${anal ? `
+            <details class="schema-desc">
+              <summary>Interpretação clínica</summary>
+              ${anal}
+            </details>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  const byItem = new Map(data.rawResponses.map(r => [r.item_number, r.score]));
+  const itemsMap = {};
+  (data.items || []).forEach(it => { itemsMap[it.n] = it.text; });
+
+  function parseRange(range) {
+    const parts = range.split('-');
+    const items = [];
+    for (let i = +parts[0]; i <= +parts[1]; i++) items.push(i);
+    return items;
+  }
+
+  renderSchemaList('order');
+  document.getElementById('sortSelect').addEventListener('change', (e) => renderSchemaList(e.target.value));
+
+  document.getElementById('rawAnswers').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
+      ${data.schemas.filter(s => s.answeredItems > 0).map(schema => {
+        const itemRange = parseRange(schema.itemRange);
+        const color = schema.level ? LEVEL_COLOR[schema.level] : 'var(--ink-soft)';
+        return `
+          <details style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px;" ${schema.average >= 3.5 ? 'open' : ''}>
+            <summary style="cursor:pointer;font-weight:600;font-size:13.5px;color:var(--ink);">
+              ${schema.name}
+              <span style="font-weight:400;color:var(--ink-soft);font-size:12px;">(${schema.code})</span>
+              <span style="float:right;color:${color};font-size:12.5px;">média ${schema.average !== null ? schema.average.toFixed(1) : '—'}</span>
+            </summary>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:4px;margin-top:10px;">
+              ${itemRange.map(n => {
+                const score = byItem.has(n) ? byItem.get(n) : null;
+                const high = score !== null && score >= 4;
+                return `
+                  <div style="text-align:center;padding:4px 2px;border-radius:6px;
+                    ${high ? 'background:var(--active-bg);' : ''}
+                    ${score === null ? 'opacity:0.3;' : ''}">
+                    <div style="font-size:10px;color:var(--ink-soft);">${n}</div>
+                    <div style="font-size:16px;font-weight:700;color:${high ? 'var(--danger)' : 'var(--ink)'};">${score !== null ? score : '—'}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </details>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatDate(iso) {
+  const d = new Date(iso + 'Z');
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+load();
+</script>
+<script>
+// Theme toggle
+const themeToggle = document.getElementById('themeToggle');
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('ysq-theme', theme);
+  if (themeToggle) themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+(function() {
+  const stored = localStorage.getItem('ysq-theme');
+  if (stored === 'dark' || stored === 'light') {
+    setTheme(stored);
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    setTheme('dark');
+  }
+})();
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+}
+
+// Print: dark mode, sorted by avg, all expanded
+document.getElementById('printBtn').addEventListener('click', () => {
+  const hadExplicitTheme = !!document.documentElement.getAttribute('data-theme');
+  const savedTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  const savedSort = document.getElementById('sortSelect').value;
+  const origTitle = document.title;
+
+  setTheme('dark');
+  document.title = '';
+
+  const sortSelect = document.getElementById('sortSelect');
+  if (sortSelect.value !== 'media') {
+    sortSelect.value = 'media';
+    sortSelect.dispatchEvent(new Event('change'));
+  }
+
+  document.querySelectorAll('details').forEach(d => d.open = true);
+
+  setTimeout(() => {
+    window.print();
+    document.title = origTitle;
+    if (savedSort && savedSort !== 'media') {
+      sortSelect.value = savedSort;
+      sortSelect.dispatchEvent(new Event('change'));
+    }
+    if (hadExplicitTheme) {
+      setTheme(savedTheme);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.removeItem('ysq-theme');
+      if (themeToggle) themeToggle.textContent = '🌙';
+    }
+  }, 150);
+});
+</script>
+</body>
+</html>

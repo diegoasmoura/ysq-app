@@ -1,0 +1,20 @@
+[
+  {"code":"pe","name":"Privação Emocional","start":1,"end":9},
+  {"code":"ai_ab","name":"Abandono/Instabilidade","start":10,"end":26},
+  {"code":"da","name":"Desconfiança/Abuso","start":27,"end":43},
+  {"code":"is","name":"Isolamento Social","start":44,"end":53},
+  {"code":"dv","name":"Defectividade/Vergonha","start":54,"end":68},
+  {"code":"fr","name":"Fracasso","start":69,"end":77},
+  {"code":"di","name":"Dependência/Incompetência","start":78,"end":92},
+  {"code":"vd","name":"Vulnerabilidade ao Dano","start":93,"end":104},
+  {"code":"em","name":"Emaranhamento","start":105,"end":115},
+  {"code":"sb","name":"Subjugação","start":116,"end":125},
+  {"code":"as","name":"Autossacrifício","start":126,"end":142},
+  {"code":"ie","name":"Inibição Emocional","start":143,"end":151},
+  {"code":"pi","name":"Padrões Inflexíveis","start":152,"end":167},
+  {"code":"ag","name":"Arrogo/Grandiosidade","start":168,"end":178},
+  {"code":"ai_id","name":"Autodisciplina Insuficiente","start":179,"end":193},
+  {"code":"ba","name":"Busca de Aprovação","start":194,"end":207},
+  {"code":"np","name":"Negatividade/Pessimismo","start":208,"end":218},
+  {"code":"pp","name":"Postura Punitiva","start":219,"end":232}
+]

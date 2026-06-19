@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Questionário de Esquemas de Young</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-mark">Y</div>
+  <div class="titles">
+    <div class="t1">Questionário de Esquemas de Young</div>
+    <div class="t2" id="patientNameLabel">Carregando...</div>
+  </div>
+  <button id="themeToggle" class="theme-btn" aria-label="Alternar tema claro/escuro" title="Alternar tema">🌙</button>
+  <div class="save-indicator" id="saveIndicator">
+    <span class="dot"></span>
+    <span id="saveText">Salvo</span>
+  </div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+<div class="page">
+  <div class="container" id="appRoot">
+    <!-- conteudo injetado via JS -->
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const token = window.location.pathname.split('/f/')[1];
+const root = document.getElementById('appRoot');
+const saveIndicator = document.getElementById('saveIndicator');
+const saveText = document.getElementById('saveText');
+const progressFill = document.getElementById('progressFill');
+const patientNameLabel = document.getElementById('patientNameLabel');
+const toastEl = document.getElementById('toast');
+
+const SCALE = [
+  { v: 1, label: 'Inteiramente falsa' },
+  { v: 2, label: 'Em grande parte falsa' },
+  { v: 3, label: 'Levemente mais verdadeira que falsa' },
+  { v: 4, label: 'Moderadamente verdadeira' },
+  { v: 5, label: 'Em grande parte verdadeira' },
+  { v: 6, label: 'Descreve perfeitamente' }
+];
+
+let state = {
+  items: [],
+  answers: {},   // itemNumber -> score
+  currentIndex: 0,
+  totalItems: 0,
+  patientName: '',
+  completed: false,
+  started: false
+};
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
+
+// ---------- Dark mode ----------
+const themeToggle = document.getElementById('themeToggle');
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('ysq-theme', theme);
+  themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+function initTheme() {
+  const stored = localStorage.getItem('ysq-theme');
+  if (stored === 'dark' || stored === 'light') {
+    setTheme(stored);
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    setTheme('dark');
+  } else {
+    setTheme('light');
+  }
+}
+themeToggle.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  setTheme(current === 'dark' ? 'light' : 'dark');
+});
+initTheme();
+
+async function loadForm() {
+  try {
+    const res = await fetch(`/api/form/${token}`);
+    if (!res.ok) {
+      renderNotFound();
+      return;
+    }
+    const data = await res.json();
+    state.items = data.items;
+    state.totalItems = data.totalItems;
+    state.patientName = data.patientName;
+    state.completed = data.completed;
+    data.responses.forEach(r => { state.answers[r.item_number] = r.score; });
+
+    patientNameLabel.textContent = state.patientName;
+
+    if (state.completed) {
+      renderAlreadyDone();
+      return;
+    }
+
+    // posiciona no primeiro item nao respondido
+    let firstUnanswered = state.items.findIndex(it => !(it.n in state.answers));
+    state.currentIndex = firstUnanswered === -1 ? state.items.length - 1 : firstUnanswered;
+
+    renderIntro();
+  } catch (e) {
+    console.error(e);
+    root.innerHTML = '<div class="card"><p>Não foi possível carregar o formulário. Verifique sua conexão e recarregue a página.</p></div>';
+  }
+}
+
+function updateProgress() {
+  const answered = Object.keys(state.answers).length;
+  const pct = Math.round((answered / state.totalItems) * 100);
+  progressFill.style.width = pct + '%';
+}
+
+function renderIntro() {
+  root.innerHTML = `
+    <div class="card intro-card">
+      <h1>Questionário de Esquemas de Young (YSQ-L3)</h1>
+      <p>Por favor, responda a cada pergunta avaliando o quanto a frase descreve o que você <strong>sente na maior parte do tempo</strong>. Tente não racionalizar e responda com base no seu sentimento íntimo.</p>
+      <p>Você pode fechar esta página a qualquer momento — suas respostas ficam salvas automaticamente e você pode continuar de onde parou.</p>
+      <p>Use as <strong>teclas 1 a 6</strong> para responder ou clique nos botões. Use <strong>← →</strong> para navegar.</p>
+      <div class="scale-key">
+        ${SCALE.map(s => `<div class="row"><span class="num">${s.v}</span><span>${s.label}</span></div>`).join('')}
+      </div>
+    </div>
+    <div class="nav-row" style="justify-content:center; margin-top:24px;">
+      <button class="btn btn-primary" id="startBtn" style="padding:14px 36px;">Começar</button>
+    </div>
+  `;
+  document.getElementById('startBtn').addEventListener('click', () => {
+    state.started = true;
+    updateProgress();
+    renderQuestion();
+  });
+  updateProgress();
+}
+
+function renderQuestion() {
+  const item = state.items[state.currentIndex];
+  const selected = state.answers[item.n];
+  const answeredCount = Object.keys(state.answers).length;
+
+  root.innerHTML = `
+    <div class="card">
+      <div class="question-eyebrow">Pergunta ${item.n} de ${state.totalItems}</div>
+      <p class="question-text">${item.text}</p>
+
+      <div class="scale-grid" role="radiogroup" aria-label="Escala de resposta">
+        ${SCALE.map(s => `
+          <button class="scale-btn ${selected === s.v ? 'selected' : ''}" data-v="${s.v}" aria-pressed="${selected === s.v}">
+            <span class="scale-num">${s.v}</span>
+            <span class="scale-keyhint">${s.v}</span>
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="scale-legend">
+        ${SCALE.map(s => `<div class="row ${selected === s.v ? 'active' : ''}"><span class="num">${s.v}</span><span>${s.label}</span></div>`).join('')}
+      </div>
+
+      <div class="nav-row">
+        <button class="btn btn-ghost" id="prevBtn" ${state.currentIndex === 0 ? 'disabled' : ''}>← Anterior</button>
+        <button class="btn btn-primary" id="nextBtn" ${selected ? '' : 'disabled'}>
+          ${state.currentIndex === state.items.length - 1 ? 'Finalizar' : 'Próxima →'}
+        </button>
+      </div>
+    </div>
+    <div class="counter">${answeredCount} de ${state.totalItems} respondidas</div>
+    <div class="reassurance">Teclas 1 a 6 para responder • ← → para navegar</div>
+  `;
+
+  document.querySelectorAll('.scale-btn').forEach(btn => {
+    btn.addEventListener('click', () => selectAnswer(Number(btn.dataset.v)));
+  });
+  document.getElementById('prevBtn').addEventListener('click', goPrev);
+  document.getElementById('nextBtn').addEventListener('click', goNext);
+}
+
+function handleKeydown(e) {
+  if (!state.started || state.completed) return;
+  const item = state.items[state.currentIndex];
+  if (!item) return;
+
+  const num = parseInt(e.key);
+  if (num >= 1 && num <= 6) {
+    e.preventDefault();
+    selectAnswer(num);
+    return;
+  }
+
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    goPrev();
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    goNext();
+  } else if (e.key === 'Enter') {
+    const selected = state.answers[item.n];
+    if (selected) {
+      e.preventDefault();
+      goNext();
+    }
+  }
+}
+
+let saveTimeout = null;
+let saveRetryTimer = null;
+let autoAdvanceTimer = null;
+document.addEventListener('keydown', handleKeydown);
+function selectAnswer(value) {
+  const item = state.items[state.currentIndex];
+  state.answers[item.n] = value;
+  renderQuestion();
+  updateProgress();
+  saveAnswer(item.n, value);
+
+  clearTimeout(autoAdvanceTimer);
+  if (state.currentIndex < state.items.length - 1) {
+    autoAdvanceTimer = setTimeout(() => {
+      state.currentIndex++;
+      renderQuestion();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 400);
+  }
+}
+
+async function saveAnswer(itemNumber, score) {
+  saveIndicator.classList.remove('saved', 'error');
+  saveIndicator.classList.add('saving');
+  saveText.textContent = 'Salvando';
+  try {
+    const res = await fetch(`/api/form/${token}/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemNumber, score })
+    });
+    if (!res.ok) throw new Error('falha ao salvar');
+    saveIndicator.classList.remove('saving');
+    saveIndicator.classList.add('saved');
+    saveText.textContent = 'Salvo';
+    progressFill.classList.add('flash');
+    setTimeout(() => progressFill.classList.remove('flash'), 400);
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      saveIndicator.classList.remove('saved');
+      saveText.textContent = 'Salvo';
+    }, 2000);
+  } catch (e) {
+    saveIndicator.classList.remove('saving');
+    saveIndicator.classList.add('error');
+    saveText.textContent = 'Erro';
+    setTimeout(() => {
+      saveIndicator.classList.remove('error');
+      saveText.textContent = 'Salvo';
+      saveAnswer(itemNumber, score);
+    }, 2500);
+  }
+}
+
+function goPrev() {
+  if (state.currentIndex > 0) {
+    state.currentIndex--;
+    renderQuestion();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+async function goNext() {
+  const item = state.items[state.currentIndex];
+  if (!(item.n in state.answers)) return;
+
+  if (state.currentIndex === state.items.length - 1) {
+    await finishForm();
+    return;
+  }
+  state.currentIndex++;
+  renderQuestion();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function finishForm() {
+  try {
+    const res = await fetch(`/api/form/${token}/finish`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.error || 'Ainda há perguntas pendentes.');
+      return;
+    }
+    renderDone();
+  } catch (e) {
+    showToast('Não foi possível finalizar. Verifique sua conexão.');
+  }
+}
+
+function renderDone() {
+  progressFill.style.width = '100%';
+  root.innerHTML = `
+    <div class="card done-screen">
+      <h1>Obrigado por concluir o questionário.</h1>
+      <p style="font-family: var(--font-body); color: var(--ink-soft); line-height:1.6;">
+        Suas respostas foram salvas com segurança. Seu terapeuta irá revisá-las e conversar sobre os resultados na próxima sessão.
+      </p>
+    </div>
+  `;
+}
+
+function renderAlreadyDone() {
+  progressFill.style.width = '100%';
+  root.innerHTML = `
+    <div class="card done-screen">
+      <h1>Este questionário já foi concluído.</h1>
+      <p style="font-family: var(--font-body); color: var(--ink-soft); line-height:1.6;">
+        Obrigado, ${state.patientName}. Não é necessário fazer nada mais por aqui.
+      </p>
+    </div>
+  `;
+}
+
+function renderNotFound() {
+  document.querySelector('.topbar').style.display = 'none';
+  document.querySelector('.progress-track').style.display = 'none';
+  root.innerHTML = `
+    <div class="card empty-state">
+      <h2>Link não encontrado</h2>
+      <p>Este link pode estar incorreto ou ter expirado. Entre em contato com seu terapeuta para obter um novo link.</p>
+    </div>
+  `;
+}
+
+loadForm();
+</script>
+</body>
+</html>

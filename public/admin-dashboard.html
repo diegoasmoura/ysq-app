@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pacientes — Agenda Clinical</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .new-patient-row { display:flex; gap:10px; margin-bottom: 24px; flex-wrap:wrap; }
+  .new-patient-row .input { flex:1; min-width: 200px; }
+  .row-actions { display:flex; gap:6px; }
+  .icon-btn {
+    background:transparent; border:1px solid var(--line); border-radius:7px;
+    padding:6px 10px; cursor:pointer; font-size:12.5px; color: var(--ink-soft);
+  }
+  .icon-btn:hover { background: var(--sand); }
+  .icon-btn.danger:hover { background: var(--hover-bg); color: var(--danger); border-color: var(--danger); }
+  .name-link { color: var(--ink); font-weight: 600; text-decoration:none; }
+  .name-link:hover { color: var(--sage-deep); }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo-mark">Y</div>
+  <div class="titles">
+    <div class="t1">Agenda Clinical</div>
+    <div class="t2">Painel do terapeuta</div>
+  </div>
+  <button id="themeToggle" class="theme-btn" aria-label="Alternar tema claro/escuro" title="Alternar tema">🌙</button>
+  <button class="icon-btn" id="passwordBtn" title="Alterar senha">🔑</button>
+  <button class="icon-btn" id="logoutBtn">Sair</button>
+</div>
+
+<div class="admin-shell">
+  <div class="admin-header">
+    <h1>Pacientes — YSQ-L3</h1>
+  </div>
+
+  <div class="card" style="margin-bottom:24px;">
+    <div class="new-patient-row">
+      <input class="input" id="newPatientName" placeholder="Nome do paciente">
+      <button class="btn btn-primary" id="addPatientBtn">+ Gerar link</button>
+    </div>
+    <div id="newLinkBox"></div>
+  </div>
+
+  <div id="patientsContainer">
+    <p style="color:var(--ink-soft); text-align:center; padding:30px;">Carregando…</p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- Theme toggle ----------
+const themeToggle = document.getElementById('themeToggle');
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('ysq-theme', theme);
+  themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+(function initTheme() {
+  const stored = localStorage.getItem('ysq-theme');
+  if (stored === 'dark' || stored === 'light') {
+    setTheme(stored);
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    setTheme('dark');
+  }
+})();
+themeToggle.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  setTheme(current === 'dark' ? 'light' : 'dark');
+});
+</script>
+
+<div class="modal-overlay hidden" id="passwordModal">
+  <div class="modal">
+    <h2>Alterar senha</h2>
+    <form id="passwordForm" onsubmit="return changePassword(event)">
+      <div class="field">
+        <label>Senha atual</label>
+        <input class="input" type="password" id="currentPassword" required minlength="1">
+      </div>
+      <div class="field">
+        <label>Nova senha</label>
+        <input class="input" type="password" id="newPassword" required minlength="6">
+      </div>
+      <div class="field">
+        <label>Confirmar nova senha</label>
+        <input class="input" type="password" id="confirmPassword" required minlength="6">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cancelPasswordBtn">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+    <p id="passwordError" class="error-msg"></p>
+  </div>
+</div>
+
+<script>
+const toastEl = document.getElementById('toast');
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch('/api/admin/logout', { method: 'POST' });
+  window.location.href = '/admin/login';
+});
+
+const passwordModal = document.getElementById('passwordModal');
+const passwordError = document.getElementById('passwordError');
+
+document.getElementById('passwordBtn').addEventListener('click', () => {
+  passwordModal.classList.remove('hidden');
+  document.getElementById('passwordForm').reset();
+  passwordError.textContent = '';
+});
+
+document.getElementById('cancelPasswordBtn').addEventListener('click', () => {
+  passwordModal.classList.add('hidden');
+});
+
+passwordModal.addEventListener('click', (e) => {
+  if (e.target === passwordModal) passwordModal.classList.add('hidden');
+});
+
+async function changePassword(event) {
+  event.preventDefault();
+  const current = document.getElementById('currentPassword').value;
+  const newPass = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('confirmPassword').value;
+
+  if (newPass !== confirm) {
+    passwordError.textContent = 'As senhas nao conferem';
+    return false;
+  }
+  if (newPass.length < 6) {
+    passwordError.textContent = 'A nova senha deve ter no minimo 6 caracteres';
+    return false;
+  }
+
+  passwordError.textContent = '';
+  try {
+    const res = await fetch('/api/admin/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: current, newPassword: newPass })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      passwordError.textContent = data.error || 'Erro ao alterar senha';
+      return false;
+    }
+    passwordModal.classList.add('hidden');
+    showToast('Senha alterada com sucesso');
+  } catch (err) {
+    passwordError.textContent = 'Erro ao conectar com o servidor';
+  }
+  return false;
+}
+
+async function loadPatients() {
+  try {
+    const res = await fetch('/api/admin/patients');
+    if (res.status === 401) { window.location.href = '/admin/login'; return; }
+    const patients = await res.json();
+    renderPatients(patients);
+  } catch (err) {
+    console.error(err);
+    showToast('Erro ao carregar pacientes');
+  }
+}
+
+function renderPatients(patients) {
+  const container = document.getElementById('patientsContainer');
+  if (patients.length === 0) {
+    container.innerHTML = `
+      <div class="card empty-state">
+        <h2>Nenhum paciente ainda</h2>
+        <p>Gere um link acima para começar.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Progresso</th>
+          <th>Status</th>
+          <th>Última resposta</th>
+          <th>Criado em</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${patients.map(p => `
+          <tr>
+            <td>
+              ${p.completedAt
+                ? `<a class="name-link" href="/admin/paciente/${p.id}">${escapeHtml(p.name)}</a>`
+                : `<span>${escapeHtml(p.name)}</span>`}
+            </td>
+            <td>
+              <div class="progress-cell">
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill" style="width:${p.progressPct}%"></div>
+                </div>
+                <span class="progress-label">${p.answeredCount}/${p.totalItems} (${p.progressPct}%)</span>
+              </div>
+            </td>
+            <td>
+              ${p.completedAt
+                ? '<span class="badge completo">Concluído</span>'
+                : (p.answeredCount > 0 ? '<span class="badge andamento">Em andamento</span>' : '<span class="badge nao-iniciado">Não iniciado</span>')}
+            </td>
+            <td>${formatDateTime(p.lastAnsweredAt)}</td>
+            <td>${formatDate(p.createdAt)}</td>
+            <td>
+              <div class="row-actions">
+                <button class="icon-btn" data-action="copy" data-token="${p.token}">Copiar link</button>
+                ${p.completedAt ? `<a class="icon-btn" href="/admin/paciente/${p.id}" style="text-decoration:none;">Ver resultado</a>` : ''}
+                <button class="icon-btn danger" data-action="delete" data-id="${p.id}" data-name="${escapeHtml(p.name)}">Excluir</button>
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  container.querySelectorAll('[data-action="copy"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = `${window.location.origin}/f/${btn.dataset.token}`;
+      navigator.clipboard.writeText(url).then(() => showToast('Link copiado para a área de transferência'));
+    });
+  });
+
+  container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Excluir o paciente "${btn.dataset.name}" e todas as suas respostas? Esta ação não pode ser desfeita.`)) return;
+      await fetch(`/api/admin/patients/${btn.dataset.id}`, { method: 'DELETE' });
+      loadPatients();
+    });
+  });
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatDate(iso) {
+  const d = new Date(iso + 'Z');
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + 'Z');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${dd}/${mm} ${hh}:${mi}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('addPatientBtn');
+  if (btn) {
+    btn.addEventListener('click', addPatient);
+  } else {
+    console.error('Botao addPatientBtn nao encontrado');
+  }
+  const input = document.getElementById('newPatientName');
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addPatient();
+    });
+  }
+});
+
+async function addPatient() {
+  try {
+    const input = document.getElementById('newPatientName');
+    const name = input.value.trim();
+    if (!name) { showToast('Digite o nome do paciente'); return; }
+
+    const res = await fetch('/api/admin/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Erro ao criar paciente'); return; }
+
+    input.value = '';
+    const url = `${window.location.origin}/f/${data.token}`;
+    document.getElementById('newLinkBox').innerHTML = `
+      <div class="link-pill" style="margin-top:4px;">
+        <span>${url}</span>
+        <button class="icon-btn" id="copyNewLink">Copiar</button>
+      </div>
+    `;
+    document.getElementById('copyNewLink').addEventListener('click', () => {
+      navigator.clipboard.writeText(url).then(() => showToast('Link copiado'));
+    });
+
+    loadPatients();
+  } catch (err) {
+    showToast('Erro: ' + err.message);
+    console.error(err);
+  }
+}
+
+loadPatients();
+</script>
+</body>
+</html>

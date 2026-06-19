@@ -1,0 +1,16 @@
+{
+  "name": "ysq-l3-app",
+  "version": "1.0.0",
+  "description": "Formulario web YSQ-L3 com salvamento automatico",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-session": "^1.18.0"
+  }
+}
